@@ -8,6 +8,8 @@ USER root
 
 RUN install-php-extensions bcmath exif gd
 
+COPY 40-laravolt-link.sh /etc/entrypoint.d/
+
 # Copy shell aliases to both root and www-data user homes
 COPY shell/aliases.sh /root/.aliases.sh
 COPY shell/bashrc /root/.bashrc
