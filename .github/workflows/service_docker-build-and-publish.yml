@@ -1,10 +1,6 @@
 on:
   workflow_call:
     inputs:
-      upstream-channel-prefix:
-        required: true
-        type: string
-        default: ""
       tag-prefix:
         required: true
         type: string
@@ -84,9 +80,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
-          build-args: |
-            UPSTREAM_CHANNEL=${{ inputs.upstream-channel-prefix }}
-            PHP_VERSION=${{ matrix.php-version }}
+          build-args: PHP_VERSION=${{ matrix.php-version }}
           context: src/.
           platforms: |
             linux/amd64
