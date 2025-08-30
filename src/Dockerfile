@@ -6,8 +6,8 @@ FROM ${BASE_IMAGE}
 # Switch to root so we can do root things
 USER root
 
-RUN apk update && \
-    apk add --no-cache git && \
+RUN apt update && \
+    apt install -y git && \
     install-php-extensions bcmath exif gd
 
 COPY 40-laravolt-link.sh /etc/entrypoint.d/
