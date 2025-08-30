@@ -1,7 +1,7 @@
-############################################
-# Base Image
-############################################
-FROM serversideup/php-dev:283-8.3-frankenphp
+ARG PHP_VERSION='8.4'
+ARG BASE_IMAGE="serversideup/php-dev:283-${PHP_VERSION}-frankenphp"
+
+FROM ${BASE_IMAGE}
 
 # Switch to root so we can do root things
 USER root
