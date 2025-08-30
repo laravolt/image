@@ -6,13 +6,19 @@ FROM ${BASE_IMAGE}
 # Switch to root so we can do root things
 USER root
 
-RUN install-php-extensions bcmath exif gd
+RUN apk update && \
+    apk add --no-cache git && \
+    install-php-extensions bcmath exif gd
 
 COPY 40-laravolt-link.sh /etc/entrypoint.d/
 
 # Copy shell aliases to both root and www-data user homes
 COPY shell/aliases.sh /root/.aliases.sh
 COPY shell/bashrc /root/.bashrc
+
+# Clean up
+RUN rm -rf /var/cache/apk/* && \
+    rm -rf /tmp/* /var/tmp/*
 
 # Drop back to our unprivileged user
 USER www-data
