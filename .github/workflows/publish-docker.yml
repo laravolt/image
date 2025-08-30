@@ -14,6 +14,7 @@ jobs:
   base:
     uses: ./.github/workflows/service_docker-build-and-publish.yml
     with:
+      tag-prefix: ""
       php-variation: base
       checkout-type: branch
     secrets: inherit
