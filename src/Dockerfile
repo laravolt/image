@@ -1,5 +1,5 @@
 ARG PHP_VERSION='8.4'
-ARG BASE_IMAGE="serversideup/php-dev:283-${PHP_VERSION}-frankenphp"
+ARG BASE_IMAGE="serversideup/php:beta-${PHP_VERSION}-frankenphp"
 
 FROM ${BASE_IMAGE}
 
@@ -17,7 +17,7 @@ COPY shell/aliases.sh /root/.aliases.sh
 COPY shell/bashrc /root/.bashrc
 
 # Clean up
-RUN rm -rf /var/cache/apk/* && \
+RUN rm -rf /var/lib/apt/lists/* && \
     rm -rf /tmp/* /var/tmp/*
 
 # Drop back to our unprivileged user
