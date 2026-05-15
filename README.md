@@ -11,7 +11,7 @@ Docker Hub: <https://hub.docker.com/r/laravoltdev/image>
 Recommended tag for Laravolt v7 applications (PHP 8.5 branch preview):
 
 ```bash
-docker pull laravoltdev/image:php8.5-frankenphp-debian
+docker pull laravoltdev/image:php8.5-prod
 ```
 
 Compatibility tags are kept for existing apps:
@@ -19,9 +19,10 @@ Compatibility tags are kept for existing apps:
 | Tag | Purpose |
 | --- | --- |
 | `laravoltdev/image:php8.5-frankenphp-debian` | Recommended PHP 8.5 FrankenPHP Debian runtime |
-| `laravoltdev/image:latest` | Latest recommended PHP runtime, currently PHP 8.5 on this branch preview |
+| `laravoltdev/image:php8.5-prod` | Production alias for deployment images |
+| `laravoltdev/image:latest` | Latest recommended production runtime, currently PHP 8.5 on this branch preview |
 
-Release builds also publish versioned tags such as `php8.5-frankenphp-debian-vX.Y.Z` and `php8.5-base-vX.Y.Z`.
+Release builds also publish versioned tags such as `php8.5-frankenphp-debian-vX.Y.Z`, `php8.5-prod-vX.Y.Z`, and `php8.5-base-vX.Y.Z`.
 
 ## Included PHP Extensions
 
@@ -53,6 +54,6 @@ docker build \
   --build-arg PHP_VERSION=8.5 \
   --build-arg BASE_VARIATION=frankenphp-debian \
   --build-arg SERVERSIDEUP_VERSION=v4.4.0 \
-  -t laravoltdev/image:php8.5-frankenphp-debian \
+  -t laravoltdev/image:php8.5-prod \
   src
 ```
