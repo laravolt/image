@@ -7,14 +7,15 @@ on:
       - main
     paths:
       - src/**
+      - .github/workflows/**
   release:
     types: [released]
 
 jobs:
-  base:
+  frankenphp-debian:
     uses: ./.github/workflows/service_docker-build-and-publish.yml
     with:
-      tag-prefix: ""
-      php-variation: base
-      checkout-type: branch
+      php-variation: frankenphp-debian
+      serversideup-version: v4.4.0
+      checkout-type: ${{ github.event_name == 'release' && 'latest-stable' || 'branch' }}
     secrets: inherit
