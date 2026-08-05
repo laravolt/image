@@ -65,7 +65,7 @@ jobs:
         run: |
           VERSION="${{ steps.latest-stable-version.outputs.LATEST_STABLE_VERSION }}"
           TAGS="laravoltdev/image:php${{ matrix.php-version }}-${{ inputs.php-variation }},laravoltdev/image:php${{ matrix.php-version }}-${{ inputs.php-variation }}-${VERSION},laravoltdev/image:php${{ matrix.php-version }}-base,laravoltdev/image:php${{ matrix.php-version }}-base-${VERSION},laravoltdev/image:php${{ matrix.php-version }}-prod,laravoltdev/image:php${{ matrix.php-version }}-prod-${VERSION}"
-          if [ "${{ matrix.php-version }}" = "8.4" ]; then
+          if [ "${{ matrix.php-version }}" = "8.5" ]; then
             TAGS="$TAGS,laravoltdev/image:latest"
           fi
           echo "DOCKER_TAGS=$TAGS" >> $GITHUB_ENV

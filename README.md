@@ -8,7 +8,7 @@ Reusable Docker base image for Laravolt/Laravel deployment. The image extends [S
 
 Docker Hub: <https://hub.docker.com/r/laravoltdev/image>
 
-Recommended tag for Laravolt v7 applications (PHP 8.5 branch preview):
+Recommended tag for Laravolt v7 applications:
 
 ```bash
 docker pull laravoltdev/image:php8.5-prod
@@ -20,7 +20,7 @@ Compatibility tags are kept for existing apps:
 | --- | --- |
 | `laravoltdev/image:php8.5-frankenphp-debian` | Recommended PHP 8.5 FrankenPHP Debian runtime |
 | `laravoltdev/image:php8.5-prod` | Production alias for deployment images |
-| `laravoltdev/image:latest` | Latest recommended production runtime, currently PHP 8.5 on this branch preview |
+| `laravoltdev/image:latest` | Latest recommended production runtime, currently PHP 8.5 |
 
 Release builds also publish versioned tags such as `php8.5-frankenphp-debian-vX.Y.Z`, `php8.5-prod-vX.Y.Z`, and `php8.5-base-vX.Y.Z`.
 
@@ -53,7 +53,7 @@ The hook is safe to skip: if Laravel or Laravolt is not installed, it exits with
 docker build \
   --build-arg PHP_VERSION=8.5 \
   --build-arg BASE_VARIATION=frankenphp-debian \
-  --build-arg SERVERSIDEUP_VERSION=v4.4.0 \
+  --build-arg SERVERSIDEUP_VERSION=v4.5.1 \
   -t laravoltdev/image:php8.5-prod \
   src
 ```

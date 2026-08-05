@@ -16,6 +16,6 @@ jobs:
     uses: ./.github/workflows/service_docker-build-and-publish.yml
     with:
       php-variation: frankenphp-debian
-      serversideup-version: v4.4.0
+      serversideup-version: v4.5.1
       checkout-type: ${{ github.event_name == 'release' && 'latest-stable' || 'branch' }}
     secrets: inherit
