@@ -32,6 +32,8 @@ The image explicitly installs the extensions commonly needed by Laravolt v7 appl
 - `exif`
 - `gd`
 - `intl`
+- `pdo_sqlsrv` — Microsoft SQL Server PDO driver
+- `sqlsrv` — Microsoft SQL Server native driver
 
 ServerSideUp already ships common Laravel runtime extensions such as `zip`, PDO database drivers, and Redis on the recommended FrankenPHP images. Keep those available through the upstream base instead of reinstalling them here.
 

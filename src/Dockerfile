@@ -15,7 +15,9 @@ RUN install-php-extensions \
     bcmath \
     exif \
     gd \
-    intl
+    intl \
+    pdo_sqlsrv \
+    sqlsrv
 
 COPY 40-laravolt-link.sh /etc/entrypoint.d/
 
