@@ -19,3 +19,9 @@ jobs:
       serversideup-version: v4.5.1
       checkout-type: ${{ github.event_name == 'release' && 'latest-stable' || 'branch' }}
     secrets: inherit
+
+  ci:
+    uses: ./.github/workflows/service_ci-build-and-publish.yml
+    with:
+      checkout-type: ${{ github.event_name == 'release' && 'latest-stable' || 'branch' }}
+    secrets: inherit
