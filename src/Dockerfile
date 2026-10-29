@@ -8,6 +8,19 @@ FROM ${BASE_IMAGE}
 # Switch to root so we can install deployment dependencies/extensions.
 USER root
 
+# The install-php-extensions bundled with the base image picks msodbcsql17 on
+# Debian 13 (trixie), which is not installable there. Install msodbcsql18 first;
+# install-php-extensions skips its own ODBC step when /opt/microsoft/msodbcsql*/ exists.
+RUN . /etc/os-release && \
+    if [ "$ID" = "debian" ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends ca-certificates curl gnupg && \
+        curl -fsSL https://packages.microsoft.com/keys/microsoft-2025.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg && \
+        curl -fsSL "https://packages.microsoft.com/config/debian/${VERSION_ID}/prod.list" -o /etc/apt/sources.list.d/mssql-release.list && \
+        apt-get update && \
+        ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 unixodbc-dev; \
+    fi
+
 # ServerSideUp PHP images already include common Laravel deployment extensions
 # such as zip, PDO database drivers, and Redis. Install only Laravolt-specific
 # extensions that are not guaranteed by the upstream image.
