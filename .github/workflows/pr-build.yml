@@ -1,0 +1,45 @@
+name: Docker Build Check
+
+on:
+  pull_request:
+    paths:
+      - src/**
+      - .github/workflows/**
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version:
+          - "8.5"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          build-args: |
+            PHP_VERSION=${{ matrix.php-version }}
+            BASE_VARIATION=frankenphp-debian
+            SERVERSIDEUP_VERSION=v4.5.1
+          context: src/.
+          platforms: linux/amd64
+          pull: true
+          push: false
+          load: true
+          tags: laravolt-image-check:php${{ matrix.php-version }}
+
+      - name: Smoke test extensions
+        run: |
+          docker run --rm --entrypoint php laravolt-image-check:php${{ matrix.php-version }} -m \
+            | grep -E '^(bcmath|exif|gd|intl|pdo_sqlsrv|sqlsrv)$' | sort | tee /tmp/ext.txt
+          test "$(wc -l < /tmp/ext.txt)" -eq 6
