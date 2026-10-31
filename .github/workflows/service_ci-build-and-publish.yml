@@ -14,37 +14,26 @@ jobs:
         php-version:
           - "8.5"
     steps:
-      - name: Get branch name
-        if: inputs.checkout-type == 'branch'
-        id: branch-name
-        uses: tj-actions/branch-names@v8
-
-      - name: Checkout branch
-        if: inputs.checkout-type == 'branch'
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.branch-name.outputs.current_branch }}
-
       - name: Get latest stable release
         if: inputs.checkout-type == 'latest-stable'
         id: latest-stable-version
-        run: |
-          echo "LATEST_STABLE_VERSION=$(curl --silent --header "Accept: application/vnd.github.v3+json" "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/releases/latest" | jq -r '.tag_name')" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "LATEST_STABLE_VERSION=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout latest stable tag
-        if: inputs.checkout-type == 'latest-stable'
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
         with:
-          ref: ${{ steps.latest-stable-version.outputs.LATEST_STABLE_VERSION }}
+          ref: ${{ inputs.checkout-type == 'latest-stable' && steps.latest-stable-version.outputs.LATEST_STABLE_VERSION || github.ref }}
 
       - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4.6.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4.4.1
 
       - name: Set Docker tags for branch builds
         if: inputs.checkout-type == 'branch'
@@ -58,11 +47,15 @@ jobs:
           echo "DOCKER_TAGS=laravoltdev/image:php${{ matrix.php-version }}-ci,laravoltdev/image:php${{ matrix.php-version }}-ci-${VERSION}" >> $GITHUB_ENV
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7.4.0
         with:
           context: src/.
           file: src/ci.Dockerfile
           platforms: linux/amd64
           pull: true
           push: true
+          provenance: mode=max
+          sbom: true
           tags: ${{ env.DOCKER_TAGS }}
+          cache-from: type=gha,scope=ci
+          cache-to: type=gha,mode=max,scope=ci

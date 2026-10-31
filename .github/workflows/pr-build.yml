@@ -16,16 +16,21 @@ jobs:
       fail-fast: false
       matrix:
         php-version:
+          - "8.3"
+          - "8.4"
           - "8.5"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
 
+      # The docker driver lets the dev image build on the image loaded above.
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4.4.1
+        with:
+          driver: docker
 
       - name: Build (no push)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7.4.0
         with:
           build-args: |
             PHP_VERSION=${{ matrix.php-version }}
@@ -38,8 +43,30 @@ jobs:
           load: true
           tags: laravolt-image-check:php${{ matrix.php-version }}
 
-      - name: Smoke test extensions
+      - name: Smoke test
+        env:
+          PHP: ${{ matrix.php-version }}
         run: |
-          docker run --rm --entrypoint php laravolt-image-check:php${{ matrix.php-version }} -m \
-            | grep -E '^(bcmath|exif|gd|intl|pdo_sqlsrv|sqlsrv)$' | sort | tee /tmp/ext.txt
-          test "$(wc -l < /tmp/ext.txt)" -eq 6
+          actual=$(docker run --rm --entrypoint php laravolt-image-check:php$PHP -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+          test "$actual" = "$PHP"
+          docker run --rm --entrypoint php laravolt-image-check:php$PHP -m \
+            | grep -E '^(bcmath|exif|gd|intl|pdo_sqlsrv|sqlsrv|zip)$' | sort | tee /tmp/ext.txt
+          test "$(wc -l < /tmp/ext.txt)" -eq 7
+
+      - name: Build the dev image on top (no push)
+        uses: docker/build-push-action@v7.4.0
+        with:
+          build-args: |
+            BASE_IMAGE=laravolt-image-check:php${{ matrix.php-version }}
+          context: src/.
+          file: src/dev.Dockerfile
+          platforms: linux/amd64
+          pull: false
+          push: false
+          load: true
+          tags: laravolt-image-check:php${{ matrix.php-version }}-dev
+
+      - name: Smoke test the dev image
+        run: |
+          docker run --rm --entrypoint bun laravolt-image-check:php${{ matrix.php-version }}-dev --version
+          docker run --rm --entrypoint php laravolt-image-check:php${{ matrix.php-version }}-dev -m | grep -qx xdebug

@@ -1,45 +1,70 @@
 [![Release](https://img.shields.io/github/v/release/laravolt/image)](https://github.com/laravolt/image/releases)
 
-## Introduction
+# laravoltdev/image
 
-Reusable Docker base image for Laravolt/Laravel deployment. The image extends [ServerSideUp PHP](https://serversideup.net/open-source/docker-php/) and adds Laravolt-friendly PHP extensions plus a small entrypoint hook that can run `php artisan laravolt:link` during container startup.
+Ready-made Docker images for Laravolt 8 applications, published to Docker Hub: <https://hub.docker.com/r/laravoltdev/image>.
 
-## Published Images
+Pull instead of building: every laptop, CI runner and server uses the same image, built once by this repository's GitHub Actions. The images extend [ServerSideUp PHP](https://serversideup.net/open-source/docker-php/) (FrankenPHP on Debian) and add the PHP extensions Laravolt needs.
 
-Docker Hub: <https://hub.docker.com/r/laravoltdev/image>
+## Tags
 
-Recommended tag for Laravolt v7 applications:
+| Tag | Use it for |
+| --- | --- |
+| `php8.5-prod` (also `php8.5-frankenphp-debian`, `php8.5-base`, `latest`) | Production: copy your app into it in your own Dockerfile |
+| `php8.5-dev` | Local development: mount your project, no build step |
+| `php8.5-ci` | CI pipelines: PHP CLI with pcov, Composer, Node.js, Bun and Playwright Chromium (amd64) |
+| `php8.4-*`, `php8.3-*` | The same runtime and dev images on PHP 8.4 and 8.3 |
 
-```bash
-docker pull laravoltdev/image:php8.5-prod
+Every release also publishes versioned tags such as `php8.5-prod-v1.2.0` and `php8.5-dev-v1.2.0`. Pin a versioned tag in production. The plain tags follow `main` and are rebuilt whenever `src/` changes.
+
+The runtime and dev images are built for `linux/amd64` and `linux/arm64`, so they run natively on Apple Silicon. Each image ships with SBOM and provenance attestations.
+
+## What is inside
+
+PHP extensions added on top of ServerSideUp:
+
+- `bcmath`, `exif`, `gd`, `intl`
+- `pdo_sqlsrv` and `sqlsrv` (Microsoft SQL Server, with `msodbcsql18`)
+
+ServerSideUp already provides `zip`, the PDO drivers for MySQL, PostgreSQL and SQLite, Redis, and OPcache.
+
+The dev image adds Bun and Xdebug. Xdebug is off by default; turn it on with `XDEBUG_MODE=debug` or `XDEBUG_MODE=coverage`.
+
+## Use it
+
+### Production
+
+```dockerfile
+FROM laravoltdev/image:php8.5-prod-v1.2.0
+
+COPY --chown=www-data:www-data . /var/www/html
+RUN composer install --no-dev --optimize-autoloader
 ```
 
-Compatibility tags are kept for existing apps:
+### Local development
 
-| Tag | Purpose |
-| --- | --- |
-| `laravoltdev/image:php8.5-frankenphp-debian` | Recommended PHP 8.5 FrankenPHP Debian runtime |
-| `laravoltdev/image:php8.5-prod` | Production alias for deployment images |
-| `laravoltdev/image:latest` | Latest recommended production runtime, currently PHP 8.5 |
+```yaml
+# docker-compose.yml
+services:
+  app:
+    image: laravoltdev/image:php8.5-dev
+    ports:
+      - "8080:8080"   # app
+      - "5173:5173"   # Vite (run `bun run dev` inside the container)
+    volumes:
+      - .:/var/www/html
+```
 
-Release builds also publish versioned tags such as `php8.5-frankenphp-debian-vX.Y.Z`, `php8.5-prod-vX.Y.Z`, and `php8.5-base-vX.Y.Z`.
+```bash
+docker compose up -d
+docker compose exec app composer install
+docker compose exec app bun install
+docker compose exec app bun run dev
+```
 
-## Included PHP Extensions
+## Laravolt entrypoint hook
 
-The image explicitly installs the extensions commonly needed by Laravolt v7 applications:
-
-- `bcmath`
-- `exif`
-- `gd`
-- `intl`
-- `pdo_sqlsrv` — Microsoft SQL Server PDO driver
-- `sqlsrv` — Microsoft SQL Server native driver
-
-ServerSideUp already ships common Laravel runtime extensions such as `zip`, PDO database drivers, and Redis on the recommended FrankenPHP images. Keep those available through the upstream base instead of reinstalling them here.
-
-## Laravolt Entrypoint Hook
-
-Set these env vars to auto-run Laravolt asset linking when a Laravel app is mounted/baked into the image:
+When these are set, the container runs `php artisan laravolt:link` on start. The dev image sets them by default.
 
 ```env
 AUTORUN_ENABLED=true
@@ -49,7 +74,9 @@ APP_BASE_DIR=/var/www/html
 
 The hook is safe to skip: if Laravel or Laravolt is not installed, it exits without failing the container.
 
-## Build Locally
+## Build locally
+
+You should not need to, but:
 
 ```bash
 docker build \
@@ -58,4 +85,11 @@ docker build \
   --build-arg SERVERSIDEUP_VERSION=v4.5.1 \
   -t laravoltdev/image:php8.5-prod \
   src
+
+docker build -f src/dev.Dockerfile --build-arg BASE_IMAGE=laravoltdev/image:php8.5-prod -t laravoltdev/image:php8.5-dev src
 ```
+
+## Releasing
+
+1. Merge to `main`. The plain tags are rebuilt and pushed after a smoke test: the PHP version and every extension above are checked before anything is pushed.
+2. Publish a GitHub release (`vX.Y.Z`). The same workflow builds the release tag and pushes the versioned tags and `latest`.
