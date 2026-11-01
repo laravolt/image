@@ -12,12 +12,12 @@ Pull instead of building: every laptop, CI runner and server uses the same image
 | --- | --- |
 | `php8.5-prod` (also `php8.5-frankenphp-debian`, `php8.5-base`, `latest`) | Production: copy your app into it in your own Dockerfile |
 | `php8.5-dev` | Local development: mount your project, no build step |
-| `php8.5-ci` | CI pipelines: PHP CLI with pcov, Composer, Node.js, Bun and Playwright Chromium (amd64) |
+| `php8.5-ci` | CI pipelines: PHP CLI with pcov, Composer, Node.js, Bun and Playwright Chromium. `/etc/playwright-version` names the Playwright version the browsers belong to |
 | `php8.4-*`, `php8.3-*` | The same runtime and dev images on PHP 8.4 and 8.3 |
 
 Every release also publishes versioned tags such as `php8.5-prod-v1.2.0` and `php8.5-dev-v1.2.0`. Pin a versioned tag in production. The plain tags follow `main` and are rebuilt whenever `src/` changes.
 
-The runtime and dev images are built for `linux/amd64` and `linux/arm64`, so they run natively on Apple Silicon. Each image ships with SBOM and provenance attestations.
+Every image is built for `linux/amd64` and `linux/arm64`, so it runs natively on Apple Silicon. The CI image is built on native arm64 runners. Each image ships with SBOM and provenance attestations.
 
 ## What is inside
 
