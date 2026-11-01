@@ -15,6 +15,9 @@ USER root
 #
 # Also apply pending Debian security updates, so a rebuild picks up fixes
 # (for example libbrotli, CVE-2026-111497) before the base image is rebuilt.
+#
+# GnuPG is only needed to convert Microsoft's signing key, so it is removed
+# again: the base image does not ship it, and nothing at runtime uses it.
 RUN . /etc/os-release && \
     if [ "$ID" = "debian" ]; then \
         apt-get update && \
@@ -23,7 +26,9 @@ RUN . /etc/os-release && \
         curl -fsSL https://packages.microsoft.com/keys/microsoft-2025.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg && \
         curl -fsSL "https://packages.microsoft.com/config/debian/${VERSION_ID}/prod.list" -o /etc/apt/sources.list.d/mssql-release.list && \
         apt-get update && \
-        ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 unixodbc-dev; \
+        ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 unixodbc-dev && \
+        apt-get purge -y gnupg gnupg-l10n gpg gpg-agent gpgconf gpgsm dirmngr pinentry-curses && \
+        apt-get autoremove -y --purge; \
     fi
 
 # ServerSideUp PHP images already include common Laravel deployment extensions

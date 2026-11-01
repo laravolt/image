@@ -26,6 +26,12 @@ if [ -n "$writable" ]; then
   exit 1
 fi
 
+# GnuPG is only used while building; it is removed again (CVE-2026-24882).
+if docker run --rm --entrypoint sh "$image" -c 'command -v gpg'; then
+  echo "gpg is still installed"
+  exit 1
+fi
+
 # The web server starts as the default user and answers its health check.
 cid=$(docker run -d -p 127.0.0.1:8080:8080 "$image")
 trap 'docker rm -f "$cid" > /dev/null' EXIT
