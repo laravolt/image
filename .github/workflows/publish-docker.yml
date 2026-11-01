@@ -8,15 +8,20 @@ on:
     paths:
       - src/**
       - .github/workflows/**
+      - .github/scripts/**
   release:
     types: [released]
+  # Weekly rebuild of the plain tags, so Debian security updates and a
+  # re-published base image reach them without a change in this repo.
+  # Versioned tags (*-v1.2.0) are only built from a release.
+  schedule:
+    - cron: "0 3 * * 1"
 
 jobs:
   frankenphp-debian:
     uses: ./.github/workflows/service_docker-build-and-publish.yml
     with:
       php-variation: frankenphp-debian
-      serversideup-version: v4.5.1
       checkout-type: ${{ github.event_name == 'release' && 'latest-stable' || 'branch' }}
     secrets: inherit
 
