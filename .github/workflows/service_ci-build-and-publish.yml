@@ -5,14 +5,20 @@ on:
         required: true
         type: string
 
+# Each architecture builds on its own native runner (Playwright's browser
+# install is very slow under QEMU), is smoke-tested, and is pushed by digest.
+# The merge job then publishes one multi-arch tag.
 jobs:
-  docker-publish:
-    runs-on: ubuntu-24.04
+  build:
     strategy:
       fail-fast: false
       matrix:
-        php-version:
-          - "8.5"
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Get latest stable release
         if: inputs.checkout-type == 'latest-stable'
@@ -26,36 +32,90 @@ jobs:
         with:
           ref: ${{ inputs.checkout-type == 'latest-stable' && steps.latest-stable-version.outputs.LATEST_STABLE_VERSION || github.ref }}
 
-      - name: Login to DockerHub
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+
+      - name: Build for the smoke test
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: src/.
+          file: src/ci.Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          pull: true
+          load: true
+          tags: laravolt-ci-test
+          cache-from: type=gha,scope=ci-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=ci-${{ matrix.arch }}
+
+      - name: Smoke test
+        run: .github/scripts/ci-smoke-test.sh laravolt-ci-test
+
+      - name: Login to Docker Hub
         uses: docker/login-action@v4.6.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.4.1
-
-      - name: Set Docker tags for branch builds
-        if: inputs.checkout-type == 'branch'
-        run: |
-          echo "DOCKER_TAGS=laravoltdev/image:php${{ matrix.php-version }}-ci" >> $GITHUB_ENV
-
-      - name: Set Docker tags for releases
-        if: inputs.checkout-type == 'latest-stable'
-        run: |
-          VERSION="${{ steps.latest-stable-version.outputs.LATEST_STABLE_VERSION }}"
-          echo "DOCKER_TAGS=laravoltdev/image:php${{ matrix.php-version }}-ci,laravoltdev/image:php${{ matrix.php-version }}-ci-${VERSION}" >> $GITHUB_ENV
-
-      - name: Build and push
+      - name: Push by digest
+        id: push
         uses: docker/build-push-action@v7.4.0
         with:
           context: src/.
           file: src/ci.Dockerfile
-          platforms: linux/amd64
-          pull: true
-          push: true
+          platforms: linux/${{ matrix.arch }}
           provenance: mode=max
           sbom: true
-          tags: ${{ env.DOCKER_TAGS }}
-          cache-from: type=gha,scope=ci
-          cache-to: type=gha,mode=max,scope=ci
+          outputs: type=image,name=laravoltdev/image,push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=ci-${{ matrix.arch }}
+
+      - name: Export the digest
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - name: Upload the digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Get latest stable release
+        if: inputs.checkout-type == 'latest-stable'
+        id: latest-stable-version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "LATEST_STABLE_VERSION=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)" >> "$GITHUB_OUTPUT"
+
+      - name: Download the digests
+        uses: actions/download-artifact@v8
+        with:
+          path: /tmp/digests
+          pattern: ci-digest-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.4.1
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4.6.0
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Publish the multi-arch tags
+        working-directory: /tmp/digests
+        env:
+          VERSION: ${{ steps.latest-stable-version.outputs.LATEST_STABLE_VERSION }}
+        run: |
+          tags=(-t laravoltdev/image:php8.5-ci)
+          if [ -n "$VERSION" ]; then tags+=(-t "laravoltdev/image:php8.5-ci-$VERSION"); fi
+          docker buildx imagetools create "${tags[@]}" $(printf 'laravoltdev/image@sha256:%s ' *)
+          docker buildx imagetools inspect laravoltdev/image:php8.5-ci

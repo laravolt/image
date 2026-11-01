@@ -12,10 +12,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
 
 ARG PHP_VERSION=8.5
-ARG COMPOSER_VERSION=2.10.2
-ARG BUN_VERSION=1.4.0
-ARG NODE_MAJOR=22
-ARG PLAYWRIGHT_VERSION=1.62.1
+ARG COMPOSER_VERSION=2.10.3
+ARG BUN_VERSION=1.4.3
+ARG NODE_MAJOR=24
+ARG PLAYWRIGHT_VERSION=1.64.1
 
 # PHP 8.5 CLI + extensions required by Laravolt projects.
 # sockets is built into php8.5-cli; pcov replaces xdebug as the coverage driver
@@ -44,7 +44,7 @@ RUN curl -fsSL -o /usr/local/bin/composer \
     && chmod +x /usr/local/bin/composer \
     && composer --version
 
-# Node.js LTS — required by Pest browser plugin (Playwright runtime).
+# Node.js LTS, required by the Pest browser plugin (Playwright runtime).
 # Bun alone cannot run Playwright's server process reliably.
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
@@ -59,9 +59,12 @@ RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}" \
 
 # Playwright Chromium + system dependencies (pinned version).
 # Uses npx to ensure Node.js-compatible browser path.
+# /etc/playwright-version records which Playwright the browsers belong to; a
+# project's `playwright` npm package should use the same version.
 RUN npx playwright@${PLAYWRIGHT_VERSION} install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/* \
-    && ls "${PLAYWRIGHT_BROWSERS_PATH}"
+    && ls "${PLAYWRIGHT_BROWSERS_PATH}" \
+    && echo "${PLAYWRIGHT_VERSION}" > /etc/playwright-version
 
 RUN rm -rf /tmp/* /var/tmp/*
 
