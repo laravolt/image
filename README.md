@@ -92,6 +92,7 @@ The weekly rebuild keeps the plain tags patched. A workflow opens a PR when Serv
 
 v2 moves the base to ServerSideUp v5. Most apps need no change. Check these points:
 
+- **A failed autorun step stops the container.** For example, `storage:link` fails when `public/` belongs to root. ServerSideUp v4 let that pass. Create the link in your Dockerfile, as root (`php artisan storage:link`), or set `AUTORUN_LARAVEL_STORAGE_LINK=false`. The autorun skips a link that already exists.
 - **FrankenPHP logs** go to `stderr`. The format is JSON when there is no terminal. Set `CADDY_LOG_FORMAT=console` if something parses the old lines.
 - **`TRUSTED_PROXY`** defaults to `cloudflare`. Behind your own load balancer or reverse proxy, set `TRUSTED_PROXY=local` so the app sees the real client IP.
 - **OPcache:** with `PHP_OPCACHE_ENABLE=1`, files are no longer re-checked (`PHP_OPCACHE_VALIDATE_TIMESTAMPS=0`). This is fine for a baked image. If you mount code, set it back to `1`.
