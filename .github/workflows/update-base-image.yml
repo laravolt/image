@@ -1,0 +1,65 @@
+name: Update base image
+
+# Opens a PR when ServerSideUp publishes a newer release in the major version
+# this repo uses, once that release is at least 14 days old. A new major
+# version only gets a notice: it needs a manual upgrade and release notes.
+on:
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Find the newest eligible ServerSideUp release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current=$(sed -nE "s/^ARG SERVERSIDEUP_VERSION='(v[0-9.]+)'$/\1/p" src/Dockerfile)
+          test -n "$current"
+          major=${current%%.*}
+          cutoff=$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ)
+          releases=$(gh api --paginate 'repos/serversideup/docker-php/releases?per_page=100' \
+            --jq ".[] | select(.prerelease == false and .draft == false and .published_at <= \"$cutoff\") | .tag_name" \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V)
+          latest=$(echo "$releases" | grep "^$major\." | tail -n1)
+          newest=$(echo "$releases" | tail -n1)
+          echo "Current $current, newest eligible in $major: $latest, newest eligible overall: $newest"
+          if [ "${newest%%.*}" != "$major" ]; then
+            echo "::notice::ServerSideUp $newest is a new major version. Upgrade by hand."
+          fi
+          if [ "$latest" != "$current" ] && [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -n1)" = "$latest" ]; then
+            sed -i "s/^ARG SERVERSIDEUP_VERSION='$current'$/ARG SERVERSIDEUP_VERSION='$latest'/" src/Dockerfile
+            echo "update=$latest" >> "$GITHUB_OUTPUT"
+            echo "current=$current" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open a pull request
+        if: steps.version.outputs.update != ''
+        id: pr
+        uses: peter-evans/create-pull-request@v8.1.1
+        with:
+          branch: update/serversideup-${{ steps.version.outputs.update }}
+          commit-message: "chore(deps): ServerSideUp ${{ steps.version.outputs.current }} -> ${{ steps.version.outputs.update }}"
+          title: "chore(deps): ServerSideUp ${{ steps.version.outputs.current }} -> ${{ steps.version.outputs.update }}"
+          body: |
+            ServerSideUp [${{ steps.version.outputs.update }}](https://github.com/serversideup/docker-php/releases/tag/${{ steps.version.outputs.update }}) is at least 14 days old.
+
+            The Docker Build Check runs on this branch (dispatched by this workflow, because a PR opened with `GITHUB_TOKEN` does not trigger it). Read the release notes, check that the build is green, then merge. Merging rebuilds the plain tags; publish a release for versioned tags.
+          delete-branch: true
+
+      - name: Run the Docker Build Check on the branch
+        if: steps.pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pr-build.yml --ref update/serversideup-${{ steps.version.outputs.update }}

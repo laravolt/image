@@ -4,9 +4,6 @@ on:
       php-variation:
         required: true
         type: string
-      serversideup-version:
-        required: true
-        type: string
       checkout-type:
         required: true
         type: string
@@ -14,6 +11,9 @@ on:
 jobs:
   docker-publish:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
     strategy:
       fail-fast: false
       matrix:
@@ -66,7 +66,6 @@ jobs:
           build-args: |
             PHP_VERSION=${{ matrix.php-version }}
             BASE_VARIATION=${{ inputs.php-variation }}
-            SERVERSIDEUP_VERSION=${{ inputs.serversideup-version }}
           context: src/.
           platforms: linux/amd64
           pull: true
@@ -76,15 +75,21 @@ jobs:
           cache-to: type=gha,mode=max,scope=php${{ matrix.php-version }}
 
       - name: Smoke test
-        env:
-          PHP: ${{ matrix.php-version }}
-        run: |
-          actual=$(docker run --rm --entrypoint php laravolt-image-test -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
-          echo "PHP $actual"
-          test "$actual" = "$PHP"
-          docker run --rm --entrypoint php laravolt-image-test -m \
-            | grep -E '^(bcmath|exif|gd|intl|pdo_sqlsrv|sqlsrv|zip)$' | sort | tee /tmp/ext.txt
-          test "$(wc -l < /tmp/ext.txt)" -eq 7
+        run: .github/scripts/smoke-test.sh laravolt-image-test ${{ matrix.php-version }}
+
+      - name: Install Trivy
+        run: .github/scripts/install-trivy.sh
+
+      # A critical vulnerability that has a fix stops the push.
+      - name: Scan for vulnerabilities
+        run: .github/scripts/scan.sh laravolt-image-test trivy-php${{ matrix.php-version }}.sarif
+
+      - name: Upload the scan to the Security tab
+        if: always() && hashFiles(format('trivy-php{0}.sarif', matrix.php-version)) != ''
+        uses: github/codeql-action/upload-sarif@v4.39.0
+        with:
+          sarif_file: trivy-php${{ matrix.php-version }}.sarif
+          category: trivy-php${{ matrix.php-version }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v4.6.0
@@ -98,7 +103,6 @@ jobs:
           build-args: |
             PHP_VERSION=${{ matrix.php-version }}
             BASE_VARIATION=${{ inputs.php-variation }}
-            SERVERSIDEUP_VERSION=${{ inputs.serversideup-version }}
           context: src/.
           platforms: linux/amd64,linux/arm64/v8
           pull: true

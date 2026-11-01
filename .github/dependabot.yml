@@ -1,0 +1,14 @@
+# GitHub Actions only. The ServerSideUp base image is updated by the
+# update-base-image workflow: its tag is built from build arguments, which
+# Dependabot's docker ecosystem cannot follow.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    groups:
+      actions:
+        patterns: ["*"]
