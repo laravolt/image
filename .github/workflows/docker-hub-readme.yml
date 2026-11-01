@@ -1,0 +1,51 @@
+name: Docker Hub README
+
+# Copies README.md to the Docker Hub overview of laravoltdev/image, with the
+# short description. Calls the Docker Hub API directly, so the token is not
+# handed to a third-party action.
+#
+# Needs the DOCKER_HUB_README_TOKEN secret: a Docker Hub personal access token
+# with "Read, Write, Delete" scope, from the account in DOCKER_HUB_USERNAME.
+# The push token cannot change the description. Without the secret this
+# workflow only prints a notice.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - README.md
+      - .github/workflows/docker-hub-readme.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Update the Docker Hub overview
+        env:
+          USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          TOKEN: ${{ secrets.DOCKER_HUB_README_TOKEN }}
+          SHORT_DESCRIPTION: "Docker images for Laravolt 8 apps: production, development and CI"
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::notice::DOCKER_HUB_README_TOKEN is not set, so the Docker Hub overview was not updated."
+            exit 0
+          fi
+
+          jwt=$(jq -n --arg id "$USERNAME" --arg secret "$TOKEN" '{identifier: $id, secret: $secret}' \
+            | curl -fsS -X POST https://hub.docker.com/v2/auth/token \
+                -H 'Content-Type: application/json' --data @- \
+            | jq -r .access_token)
+          echo "::add-mask::$jwt"
+
+          jq -n --arg short "$SHORT_DESCRIPTION" --rawfile full README.md \
+              '{description: $short, full_description: $full}' \
+            | curl -fsS -o /dev/null -w 'Docker Hub answered HTTP %{http_code}\n' \
+                -X PATCH https://hub.docker.com/v2/namespaces/laravoltdev/repositories/image \
+                -H "Authorization: Bearer $jwt" -H 'Content-Type: application/json' --data @-

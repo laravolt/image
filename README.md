@@ -120,3 +120,4 @@ docker build -f src/dev.Dockerfile --build-arg BASE_IMAGE=laravoltdev/image:php8
 
 1. Merge to `main`. The plain tags are rebuilt and pushed after the checks in [Security](#security). Pull requests run the same checks, and also build laravel-starter-kit's production image on top of the new image and load its login page.
 2. Publish a GitHub release (`vX.Y.Z`). The same workflow builds the release tag and pushes the versioned tags and `latest`.
+3. Changes to this README are copied to the [Docker Hub overview](https://hub.docker.com/r/laravoltdev/image) by the `docker-hub-readme` workflow (needs the `DOCKER_HUB_README_TOKEN` secret).
