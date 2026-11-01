@@ -5,6 +5,10 @@ on:
     paths:
       - src/**
       - .github/workflows/**
+      - .github/scripts/**
+  # The update-base-image workflow dispatches this on its PR branch, because a
+  # PR opened with GITHUB_TOKEN does not trigger pull_request workflows.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35,7 +39,6 @@ jobs:
           build-args: |
             PHP_VERSION=${{ matrix.php-version }}
             BASE_VARIATION=frankenphp-debian
-            SERVERSIDEUP_VERSION=v4.5.1
           context: src/.
           platforms: linux/amd64
           pull: true
@@ -44,14 +47,17 @@ jobs:
           tags: laravolt-image-check:php${{ matrix.php-version }}
 
       - name: Smoke test
-        env:
-          PHP: ${{ matrix.php-version }}
-        run: |
-          actual=$(docker run --rm --entrypoint php laravolt-image-check:php$PHP -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
-          test "$actual" = "$PHP"
-          docker run --rm --entrypoint php laravolt-image-check:php$PHP -m \
-            | grep -E '^(bcmath|exif|gd|intl|pdo_sqlsrv|sqlsrv|zip)$' | sort | tee /tmp/ext.txt
-          test "$(wc -l < /tmp/ext.txt)" -eq 7
+        run: .github/scripts/smoke-test.sh laravolt-image-check:php${{ matrix.php-version }} ${{ matrix.php-version }}
+
+      - name: Install Trivy
+        run: .github/scripts/install-trivy.sh
+
+      - name: Scan for vulnerabilities
+        run: .github/scripts/scan.sh laravolt-image-check:php${{ matrix.php-version }}
+
+      - name: Run laravel-starter-kit on the image
+        if: matrix.php-version == '8.5'
+        run: .github/scripts/app-test.sh laravolt-image-check:php${{ matrix.php-version }}
 
       - name: Build the dev image on top (no push)
         uses: docker/build-push-action@v7.4.0
@@ -70,3 +76,8 @@ jobs:
         run: |
           docker run --rm --entrypoint bun laravolt-image-check:php${{ matrix.php-version }}-dev --version
           docker run --rm --entrypoint php laravolt-image-check:php${{ matrix.php-version }}-dev -m | grep -qx xdebug
+          # Starts with no project mounted (AUTORUN_LARAVEL_SKIP_IF_NOT_FOUND) and answers its health check.
+          cid=$(docker run -d -p 127.0.0.1:8081:8080 laravolt-image-check:php${{ matrix.php-version }}-dev)
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8081/healthcheck && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8081/healthcheck || { docker logs "$cid"; exit 1; }
+          docker rm -f "$cid"

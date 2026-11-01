@@ -18,8 +18,11 @@ RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash -s "bun-v${B
 # Xdebug, off by default. Turn it on per container with XDEBUG_MODE=debug (or coverage).
 RUN install-php-extensions xdebug \
     && rm -rf /tmp/* /var/tmp/* /var/lib/apt/lists/*
+# AUTORUN_LARAVEL_SKIP_IF_NOT_FOUND (ServerSideUp v5) keeps the container running
+# when it starts before a Laravel project is mounted or installed.
 ENV XDEBUG_MODE=off \
     AUTORUN_ENABLED=true \
+    AUTORUN_LARAVEL_SKIP_IF_NOT_FOUND=true \
     AUTORUN_LARAVOLT_LINK=true
 
 EXPOSE 5173
