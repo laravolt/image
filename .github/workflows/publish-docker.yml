@@ -17,8 +17,16 @@ on:
   schedule:
     - cron: "0 3 * * 1"
 
+# One publish at a time per ref, so overlapping runs cannot move a tag between
+# a run's runtime push and the dev image built on it.
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   frankenphp-debian:
+    # A manual run publishes the moving tags, so it is only allowed from main.
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     permissions:
       contents: read
       security-events: write
@@ -29,6 +37,7 @@ jobs:
     secrets: inherit
 
   ci:
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     permissions:
       contents: read
     uses: ./.github/workflows/service_ci-build-and-publish.yml

@@ -22,6 +22,9 @@ permissions:
 
 jobs:
   sync:
+    if: github.ref == 'refs/heads/main'
+    # DOCKER_HUB_README_TOKEN lives in the docker-hub environment (reviewers required).
+    environment: docker-hub
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout

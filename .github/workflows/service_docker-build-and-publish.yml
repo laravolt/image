@@ -11,6 +11,8 @@ on:
 jobs:
   docker-publish:
     runs-on: ubuntu-24.04
+    # DOCKER_HUB_* secrets live in the docker-hub environment (reviewers required).
+    environment: docker-hub
     permissions:
       contents: read
       security-events: write
@@ -50,8 +52,6 @@ jobs:
           fi
           echo "RUNTIME_TAGS=$runtime" >> "$GITHUB_ENV"
           echo "DEV_TAGS=$dev" >> "$GITHUB_ENV"
-          # The first tag is the one the dev image builds on.
-          echo "RUNTIME_IMAGE=${runtime%%,*}" >> "$GITHUB_ENV"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4.4.0
@@ -59,30 +59,49 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4.4.1
 
-      # Test before anything is pushed: a broken build must not replace a working tag.
-      - name: Build for the smoke test
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4.6.0
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      # Push without tags. Only the digest that passes the checks below gets the tags,
+      # so the tested and scanned bytes are exactly the ones published.
+      - name: Build and push the runtime image by digest
+        id: runtime
         uses: docker/build-push-action@v7.4.0
         with:
           build-args: |
             PHP_VERSION=${{ matrix.php-version }}
             BASE_VARIATION=${{ inputs.php-variation }}
           context: src/.
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64/v8
           pull: true
-          load: true
-          tags: laravolt-image-test
+          provenance: mode=max
+          sbom: true
+          outputs: type=image,name=laravoltdev/image,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=php${{ matrix.php-version }}
           cache-to: type=gha,mode=max,scope=php${{ matrix.php-version }}
 
-      - name: Smoke test
-        run: .github/scripts/smoke-test.sh laravolt-image-test ${{ matrix.php-version }}
+      - name: Pull both architectures of that digest
+        env:
+          REF: laravoltdev/image@${{ steps.runtime.outputs.digest }}
+        run: |
+          docker pull --platform linux/amd64 "$REF" && docker tag "$REF" laravolt-image-amd64
+          docker pull --platform linux/arm64/v8 "$REF" && docker tag "$REF" laravolt-image-arm64
+
+      - name: Smoke test (amd64)
+        run: .github/scripts/smoke-test.sh laravolt-image-amd64 ${{ matrix.php-version }}
 
       - name: Install Trivy
         run: .github/scripts/install-trivy.sh
 
-      # A critical vulnerability that has a fix stops the push.
-      - name: Scan for vulnerabilities
-        run: .github/scripts/scan.sh laravolt-image-test trivy-php${{ matrix.php-version }}.sarif
+      # A critical vulnerability that has a fix stops the tagging, on either architecture.
+      - name: Scan for vulnerabilities (amd64)
+        run: .github/scripts/scan.sh laravolt-image-amd64 trivy-php${{ matrix.php-version }}.sarif
+
+      - name: Scan for vulnerabilities (arm64)
+        run: .github/scripts/scan.sh laravolt-image-arm64
 
       - name: Upload the scan to the Security tab
         if: always() && hashFiles(format('trivy-php{0}.sarif', matrix.php-version)) != ''
@@ -91,38 +110,44 @@ jobs:
           sarif_file: trivy-php${{ matrix.php-version }}.sarif
           category: trivy-php${{ matrix.php-version }}
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v4.6.0
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+      - name: Tag the verified runtime image
+        env:
+          DIGEST: ${{ steps.runtime.outputs.digest }}
+        run: |
+          args=()
+          IFS=',' read -ra tags <<< "$RUNTIME_TAGS"
+          for tag in "${tags[@]}"; do args+=(-t "$tag"); done
+          docker buildx imagetools create "${args[@]}" "laravoltdev/image@$DIGEST"
 
-      - name: Build and push the runtime image
+      # The dev image builds on the verified runtime digest, not on a tag that another run could move.
+      - name: Build and push the dev image by digest
+        id: dev
         uses: docker/build-push-action@v7.4.0
         with:
           build-args: |
-            PHP_VERSION=${{ matrix.php-version }}
-            BASE_VARIATION=${{ inputs.php-variation }}
-          context: src/.
-          platforms: linux/amd64,linux/arm64/v8
-          pull: true
-          push: true
-          provenance: mode=max
-          sbom: true
-          tags: ${{ env.RUNTIME_TAGS }}
-          cache-from: type=gha,scope=php${{ matrix.php-version }}
-          cache-to: type=gha,mode=max,scope=php${{ matrix.php-version }}
-
-      - name: Build and push the dev image
-        uses: docker/build-push-action@v7.4.0
-        with:
-          build-args: |
-            BASE_IMAGE=${{ env.RUNTIME_IMAGE }}
+            BASE_IMAGE=laravoltdev/image@${{ steps.runtime.outputs.digest }}
           context: src/.
           file: src/dev.Dockerfile
           platforms: linux/amd64,linux/arm64/v8
           pull: true
-          push: true
           provenance: mode=max
           sbom: true
-          tags: ${{ env.DEV_TAGS }}
+          outputs: type=image,name=laravoltdev/image,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Scan the dev image (amd64 and arm64)
+        env:
+          REF: laravoltdev/image@${{ steps.dev.outputs.digest }}
+        run: |
+          docker pull --platform linux/amd64 "$REF" && docker tag "$REF" laravolt-dev-amd64
+          docker pull --platform linux/arm64/v8 "$REF" && docker tag "$REF" laravolt-dev-arm64
+          .github/scripts/scan.sh laravolt-dev-amd64
+          .github/scripts/scan.sh laravolt-dev-arm64
+
+      - name: Tag the verified dev image
+        env:
+          DIGEST: ${{ steps.dev.outputs.digest }}
+        run: |
+          args=()
+          IFS=',' read -ra tags <<< "$DEV_TAGS"
+          for tag in "${tags[@]}"; do args+=(-t "$tag"); done
+          docker buildx imagetools create "${args[@]}" "laravoltdev/image@$DIGEST"

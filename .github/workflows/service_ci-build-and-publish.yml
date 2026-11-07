@@ -10,6 +10,7 @@ on:
 # The merge job then publishes one multi-arch tag.
 jobs:
   build:
+    environment: docker-hub
     permissions:
       contents: read
     strategy:
@@ -86,6 +87,7 @@ jobs:
           retention-days: 1
 
   merge:
+    environment: docker-hub
     permissions:
       contents: read
     needs: build
