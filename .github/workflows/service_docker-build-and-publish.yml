@@ -86,9 +86,7 @@ jobs:
       - name: Pull both architectures of that digest
         env:
           REF: laravoltdev/image@${{ steps.runtime.outputs.digest }}
-        run: |
-          docker pull --platform linux/amd64 "$REF" && docker tag "$REF" laravolt-image-amd64
-          docker pull --platform linux/arm64/v8 "$REF" && docker tag "$REF" laravolt-image-arm64
+        run: .github/scripts/pull-platforms.sh "$REF" laravolt-image
 
       - name: Smoke test (amd64)
         run: .github/scripts/smoke-test.sh laravolt-image-amd64 ${{ matrix.php-version }}
@@ -138,8 +136,7 @@ jobs:
         env:
           REF: laravoltdev/image@${{ steps.dev.outputs.digest }}
         run: |
-          docker pull --platform linux/amd64 "$REF" && docker tag "$REF" laravolt-dev-amd64
-          docker pull --platform linux/arm64/v8 "$REF" && docker tag "$REF" laravolt-dev-arm64
+          .github/scripts/pull-platforms.sh "$REF" laravolt-dev
           .github/scripts/scan.sh laravolt-dev-amd64
           .github/scripts/scan.sh laravolt-dev-arm64
 
