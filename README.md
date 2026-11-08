@@ -78,12 +78,12 @@ The hook is safe to skip: if Laravel or Laravolt is not installed, it exits with
 
 ## Security
 
-Before anything is pushed, every runtime image goes through these checks:
+Every runtime image is pushed by digest first and gets its tags only after that exact digest passes these checks (Trivy runs on both amd64 and arm64; the PHP checks run on amd64):
 
 - **PHP and extensions.** The PHP version (the full patch version is printed in the log) and the extensions listed above are checked.
 - **No world-writable files** outside sticky directories such as `/tmp`. ServerSideUp v4.3.1 to v5.0.4 shipped a world-writable Caddyfile ([GHSA-xx74-jh2r-mgm3](https://github.com/serversideup/docker-php/security/advisories/GHSA-xx74-jh2r-mgm3)).
 - **Session upload progress is off** (`session.upload_progress.enabled`), until PHP fixes CVE-2026-115560. Laravel does not use it.
-- **Trivy scan.** A critical vulnerability with a fix available stops the push. The repository's Security tab lists every HIGH or CRITICAL vulnerability that has a fix, so each alert there calls for action. The ones still waiting for a fix are listed in the summary of each build run.
+- **Trivy scan.** A critical vulnerability with a fix available stops the tagging, for the runtime and the dev image. The repository's Security tab lists every HIGH or CRITICAL vulnerability that has a fix, so each alert there calls for action. The ones still waiting for a fix are listed in the summary of each build run.
   - The scan skips kernel CVEs reported against `linux-libc-dev`. That package only holds the headers used to compile PHP extensions, and a container runs on the host's kernel. Patch the host for those.
 - **Pending Debian security updates** are installed at build time.
 
