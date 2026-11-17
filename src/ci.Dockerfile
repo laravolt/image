@@ -21,10 +21,18 @@ ARG PLAYWRIGHT_VERSION=1.64.1
 # sockets is built into php8.5-cli; pcov replaces xdebug as the coverage driver
 # (lighter, no "zend_mm_heap corrupted" crashes with pest --type-coverage).
 # sqlite3 for in-memory test databases. No sqlsrv — tests use SQLite.
-RUN apt-get update \
+# add-apt-repository looks the PPA key up on the Launchpad API, which can time
+# out on a runner (16 Nov 2026 arm64 publish), so it gets a few tries; apt
+# retries its own downloads.
+RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
         software-properties-common ca-certificates curl gnupg git unzip \
-    && add-apt-repository -y ppa:ondrej/php \
+    && for i in 1 2 3 4 5; do \
+        add-apt-repository -y ppa:ondrej/php && break; \
+        [ "$i" = 5 ] && exit 1; \
+        sleep $((i * 15)); \
+    done \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
         php${PHP_VERSION}-cli php${PHP_VERSION}-mbstring php${PHP_VERSION}-xml \
