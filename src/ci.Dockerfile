@@ -22,8 +22,10 @@ ARG PLAYWRIGHT_VERSION=1.64.1
 # (lighter, no "zend_mm_heap corrupted" crashes with pest --type-coverage).
 # sqlite3 for in-memory test databases. No sqlsrv — tests use SQLite.
 # add-apt-repository looks the PPA key up on the Launchpad API, which can time
-# out on a runner (16 Nov 2026 arm64 publish), so it gets a few tries; apt
-# retries its own downloads.
+# out on a runner (16 Nov 2026 arm64 publish), so it gets a few tries. The PPA
+# download server can also answer 503 for several minutes (23 Nov 2026 publish),
+# longer than apt's own retries last, so the PHP install is retried after 2, 4
+# and 6 minutes before the build fails.
 RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -33,12 +35,17 @@ RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
         [ "$i" = 5 ] && exit 1; \
         sleep $((i * 15)); \
     done \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        php${PHP_VERSION}-cli php${PHP_VERSION}-mbstring php${PHP_VERSION}-xml \
-        php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-bcmath \
-        php${PHP_VERSION}-intl php${PHP_VERSION}-gd php${PHP_VERSION}-sqlite3 \
-        php${PHP_VERSION}-pcov sqlite3 \
+    && for i in 1 2 3 4; do \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+            php${PHP_VERSION}-cli php${PHP_VERSION}-mbstring php${PHP_VERSION}-xml \
+            php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-bcmath \
+            php${PHP_VERSION}-intl php${PHP_VERSION}-gd php${PHP_VERSION}-sqlite3 \
+            php${PHP_VERSION}-pcov sqlite3 \
+        && break; \
+        [ "$i" = 4 ] && exit 1; \
+        sleep $((i * 120)); \
+    done \
     && update-alternatives --set php /usr/bin/php${PHP_VERSION} \
     && rm -rf /var/lib/apt/lists/* \
     && php -v \
