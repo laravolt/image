@@ -47,7 +47,7 @@ jobs:
       - name: Open a pull request
         if: steps.version.outputs.update != ''
         id: pr
-        uses: peter-evans/create-pull-request@v8.1.1
+        uses: peter-evans/create-pull-request@v8.1.2
         with:
           branch: update/serversideup-${{ steps.version.outputs.update }}
           commit-message: "chore(deps): ServerSideUp ${{ steps.version.outputs.current }} -> ${{ steps.version.outputs.update }}"
