@@ -2,55 +2,45 @@
 # PHP 8.5 CLI + Composer + Bun + Node.js LTS + Playwright Chromium.
 # Published to Docker Hub as laravoltdev/image:php8.5-ci
 #
+# Built on the ServerSideUp PHP CLI image (Debian 13 trixie), the same release
+# as the runtime image. Until 23 Nov 2026 it was Ubuntu 24.04 with PHP from the
+# ondrej/php PPA, whose download server failed three weekly publishes in a row.
+#
 # Does NOT include: FrankenPHP, sqlsrv, or runtime server components.
 # Use the runtime image (laravoltdev/image:php8.5-prod) for deployments.
 
-FROM ubuntu:24.04
+ARG PHP_VERSION=8.5
+# ServerSideUp release, kept equal to src/Dockerfile (update-base-image bumps both).
+ARG SERVERSIDEUP_VERSION='v5.1.2'
+
+FROM serversideup/php:${PHP_VERSION}-cli-trixie-${SERVERSIDEUP_VERSION}
 
 USER root
+# PHP_MEMORY_LIMIT: CLI tools in CI (PHPStan, Pest) need more than the base
+# image's 256M; -1 matches the CLI default of the Ubuntu-based image.
 ENV DEBIAN_FRONTEND=noninteractive \
-    PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
+    PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright \
+    PHP_MEMORY_LIMIT=-1
 
-ARG PHP_VERSION=8.5
+ARG PHP_VERSION
 ARG COMPOSER_VERSION=2.10.3
 ARG BUN_VERSION=1.4.3
 ARG NODE_MAJOR=24
 ARG PLAYWRIGHT_VERSION=1.64.1
 
-# PHP 8.5 CLI + extensions required by Laravolt projects.
-# sockets is built into php8.5-cli; pcov replaces xdebug as the coverage driver
-# (lighter, no "zend_mm_heap corrupted" crashes with pest --type-coverage).
-# sqlite3 for in-memory test databases. No sqlsrv — tests use SQLite.
-# add-apt-repository looks the PPA key up on the Launchpad API, which can time
-# out on a runner (16 Nov 2026 arm64 publish), so it gets a few tries. The PPA
-# download server can also answer 503 for several minutes (23 Nov 2026 publish),
-# longer than apt's own retries last, so the PHP install is retried after 2, 4
-# and 6 minutes before the build fails.
-RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        software-properties-common ca-certificates curl gnupg git unzip \
-    && for i in 1 2 3 4 5; do \
-        add-apt-repository -y ppa:ondrej/php && break; \
-        [ "$i" = 5 ] && exit 1; \
-        sleep $((i * 15)); \
-    done \
-    && for i in 1 2 3 4; do \
-        apt-get update \
-        && apt-get install -y --no-install-recommends \
-            php${PHP_VERSION}-cli php${PHP_VERSION}-mbstring php${PHP_VERSION}-xml \
-            php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-bcmath \
-            php${PHP_VERSION}-intl php${PHP_VERSION}-gd php${PHP_VERSION}-sqlite3 \
-            php${PHP_VERSION}-pcov sqlite3 \
-        && break; \
-        [ "$i" = 4 ] && exit 1; \
-        sleep $((i * 120)); \
-    done \
-    && update-alternatives --set php /usr/bin/php${PHP_VERSION} \
+# Extensions required by Laravolt projects, built by install-php-extensions from
+# the base image (Debian packages + PECL, no PPA). pcov replaces xdebug as the
+# coverage driver (lighter, no "zend_mm_heap corrupted" crashes with
+# pest --type-coverage). sqlite3 for in-memory test databases. No sqlsrv: tests
+# use SQLite. Pending Debian security updates are applied first.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends ca-certificates curl git unzip sqlite3 \
+    && install-php-extensions bcmath gd intl pcov sockets zip pdo_sqlite \
     && rm -rf /var/lib/apt/lists/* \
     && php -v \
-    && php -m | grep -qx sockets \
-    && php -m | grep -qx pcov \
+    && test "$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')" = "${PHP_VERSION}" \
+    && for ext in bcmath gd intl pcov sockets zip pdo_sqlite; do php -m | grep -qx "$ext" || exit 1; done \
     && ! php -m | grep -qi xdebug
 
 # Composer (pinned version)
@@ -83,5 +73,9 @@ RUN npx playwright@${PLAYWRIGHT_VERSION} install --with-deps chromium \
 
 RUN rm -rf /tmp/* /var/tmp/*
 
+# Plain shell like the Ubuntu-based image: no ServerSideUp entrypoint, root user.
+ENTRYPOINT []
+CMD ["/bin/bash"]
+
 LABEL org.opencontainers.image.title="laravolt-ci" \
-      org.opencontainers.image.description="CI image for Laravolt projects: PHP ${PHP_VERSION} (pcov), Composer ${COMPOSER_VERSION}, Node.js ${NODE_MAJOR}.x, Bun ${BUN_VERSION}, Playwright ${PLAYWRIGHT_VERSION} Chromium"
+      org.opencontainers.image.description="CI image for Laravolt projects (Debian 13): PHP ${PHP_VERSION} (pcov), Composer ${COMPOSER_VERSION}, Node.js ${NODE_MAJOR}.x, Bun ${BUN_VERSION}, Playwright ${PLAYWRIGHT_VERSION} Chromium"

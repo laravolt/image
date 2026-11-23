@@ -12,7 +12,7 @@ Pull instead of building: every laptop, CI runner and server uses the same image
 | --- | --- |
 | `php8.5-prod` (also `php8.5-frankenphp-debian`, `php8.5-base`, `latest`) | Production: copy your app into it in your own Dockerfile |
 | `php8.5-dev` | Local development: mount your project, no build step |
-| `php8.5-ci` | CI pipelines: PHP CLI with pcov, Composer, Node.js, Bun and Playwright Chromium. `/etc/playwright-version` names the Playwright version the browsers belong to |
+| `php8.5-ci` | CI pipelines (Debian 13, ServerSideUp PHP CLI base): PHP CLI with pcov, Composer, Node.js, Bun and Playwright Chromium. `/etc/playwright-version` names the Playwright version the browsers belong to |
 | `php8.4-*`, `php8.3-*` | The same runtime and dev images on PHP 8.4 and 8.3 |
 
 Every release also publishes versioned tags such as `php8.5-prod-v2.0.0` and `php8.5-dev-v2.0.0`. Pin a versioned tag in production. The plain tags follow `main`. They are rebuilt whenever `src/` changes, and every Monday so that Debian security updates reach them.

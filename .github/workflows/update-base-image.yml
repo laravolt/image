@@ -39,7 +39,7 @@ jobs:
             echo "::notice::ServerSideUp $newest is a new major version. Upgrade by hand."
           fi
           if [ "$latest" != "$current" ] && [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -n1)" = "$latest" ]; then
-            sed -i "s/^ARG SERVERSIDEUP_VERSION='$current'$/ARG SERVERSIDEUP_VERSION='$latest'/" src/Dockerfile
+            sed -i "s/^ARG SERVERSIDEUP_VERSION='$current'$/ARG SERVERSIDEUP_VERSION='$latest'/" src/Dockerfile src/ci.Dockerfile
             echo "update=$latest" >> "$GITHUB_OUTPUT"
             echo "current=$current" >> "$GITHUB_OUTPUT"
           fi
