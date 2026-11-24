@@ -1,7 +1,7 @@
 ARG PHP_VERSION='8.5'
 ARG BASE_VARIATION='frankenphp-debian'
 # ServerSideUp release. The update-base-image workflow bumps it; the build workflows read it from here.
-ARG SERVERSIDEUP_VERSION='v5.1.2'
+ARG SERVERSIDEUP_VERSION='v5.2.1'
 ARG BASE_IMAGE="serversideup/php:${PHP_VERSION}-${BASE_VARIATION}-${SERVERSIDEUP_VERSION}"
 
 FROM ${BASE_IMAGE}

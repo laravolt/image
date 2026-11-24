@@ -11,7 +11,7 @@
 
 ARG PHP_VERSION=8.5
 # ServerSideUp release, kept equal to src/Dockerfile (update-base-image bumps both).
-ARG SERVERSIDEUP_VERSION='v5.1.2'
+ARG SERVERSIDEUP_VERSION='v5.2.1'
 
 FROM serversideup/php:${PHP_VERSION}-cli-trixie-${SERVERSIDEUP_VERSION}
 
